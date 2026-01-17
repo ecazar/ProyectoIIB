@@ -1,0 +1,1 @@
+pip install torch transformers sentence-transformers Pillow pandas requests google-generativeai scikit-learn
