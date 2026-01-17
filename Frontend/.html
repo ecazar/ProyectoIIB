@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fashion Search Assistant</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🛍️ Fashion Search Assistant</h1>
+            <p>Encuentra tu estilo perfecto con búsqueda inteligente por texto o imagen</p>
+        </div>
+
+        <div class="chat-container" id="chatContainer">
+            <div class="message bot">
+                <div class="message-content">
+                    ¡Hola! 👋 Soy tu <strong>asistente de búsqueda de moda</strong>. Puedes buscar productos escribiendo una descripción o subiendo una imagen. <strong>¿En qué puedo ayudarte hoy?</strong>
+                </div>
+            </div>
+        </div>
+
+        <div class="input-container">
+            <div id="imagePreviewContainer"></div>
+            <div class="input-wrapper">
+                <input type="text"
+                       class="search-input"
+                       id="searchInput"
+                       placeholder="Describe lo que buscas...">
+                <input type="file"
+                       class="file-input"
+                       id="fileInput"
+                       accept="image/*">
+                <button class="btn btn-image" id="imageBtn">
+                    📷 Imagen
+                </button>
+                <button class="btn btn-send" id="sendBtn">
+                    Buscar ✨
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
