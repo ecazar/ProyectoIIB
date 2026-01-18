@@ -82,14 +82,26 @@ async function handleSearch() {
     const input = document.getElementById('searchInput');
     const query = input.value.trim();
 
+    // 1. Validar que haya algo que buscar
     if (!query && !currentImage) {
         addMessage('⚠️ Por favor, escribe una búsqueda o sube una imagen.', false);
         return;
     }
 
-    // Mostrar mensaje del usuario en el chat
+    // 2. Crear UN SOLO FormData para toda la función
+    const formData = new FormData();
+    const isImageSearch = !!currentImage;
+
+    if (isImageSearch) {
+        formData.append('file', currentImage); // 'file' debe coincidir con el backend
+        if (query) formData.append('message', query);
+    } else {
+        formData.append('message', query);
+    }
+
+    // 3. Mostrar mensaje del usuario en el chat (UI)
     const userMessageContent = document.createElement('div');
-    if (currentImage && currentImagePreview) {
+    if (isImageSearch && currentImagePreview) {
         const img = document.createElement('img');
         img.src = currentImagePreview;
         img.className = 'image-preview';
@@ -103,62 +115,42 @@ async function handleSearch() {
     }
     addMessage(userMessageContent, true);
 
-    // Limpiar UI
+    // Guardar referencia a la imagen para limpiar después del fetch exitoso
+    const tempImage = currentImage;
+
+    // Limpiar entrada de texto inmediatamente
     input.value = '';
     removeImage();
 
-    // Mostrar loading con ID único para removerlo luego
+    // 4. Mostrar loading
     const loadingId = 'loading-' + Date.now();
-    const loadingMsg = `
-        <div id="${loadingId}" style="display: flex; align-items: center; gap: 12px;">
-            <div class="loading"></div>
-            <span style="font-size: 16px;">Analizando tu estilo...</span>
-        </div>
-    `;
-    addMessage(loadingMsg, false);
+    addMessage(`<div id="${loadingId}" style="display: flex; align-items: center; gap: 12px;"><div class="loading"></div><span>Analizando tu estilo...</span></div>`, false);
 
     try {
-        const formData = new FormData();
-        if (currentImage) {
-            formData.append('file', currentImage);
-            if (query) formData.append('message', query);
-        } else {
-            formData.append('message', query);
-        }
-
-        const endpoint = currentImage ? 'http://localhost:8000/search-image' : 'http://localhost:8000/chat';
+        const endpoint = isImageSearch ? 'http://localhost:8000/search-image' : 'http://localhost:8000/chat';
 
         const response = await fetch(endpoint, {
             method: 'POST',
-            body: formData
+            body: formData // No añadir Headers de Content-Type manualmente
         });
 
-        if (!response.ok) throw new Error('Error en el servidor');
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.detail || 'Error en el servidor');
+        }
 
         const data = await response.json();
 
-        // Remover el loading usando el ID
+        // Remover el loading
         const loadingElement = document.getElementById(loadingId);
-        if (loadingElement) {
-            loadingElement.closest('.message').remove();
-        }
+        if (loadingElement) loadingElement.closest('.message').remove();
 
-        // --- INTEGRACIÓN CON LAS LLAVES DEL BACKEND ---
-        // data.answer contiene el texto de Gemini
-        if (data.answer) {
-            addMessage(data.answer, false);
-        }
-
-        // data.items contiene la lista de productos
-        if (data.items && data.items.length > 0) {
-            displayResults(data.items);
-        } else if (!data.answer) {
-            addMessage('😔 No encontré productos exactos en nuestro catálogo.', false);
-        }
+        if (data.answer) addMessage(data.answer, false);
+        if (data.items && data.items.length > 0) displayResults(data.items);
 
     } catch (error) {
-        console.error('Error:', error);
-        addMessage(`❌ Error: ${error.message}. Verifica que el backend esté activo.`, false);
+        console.error('Error detallado:', error);
+        addMessage(`❌ Error: ${error.message}`, false);
     }
 }
 

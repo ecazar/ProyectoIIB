@@ -33,17 +33,21 @@ clip_model = SentenceTransformer(CLIP_MODEL_NAME)
 vit_processor = ViTImageProcessor.from_pretrained(VIT_MODEL_NAME)
 vit_model = ViTModel.from_pretrained(VIT_MODEL_NAME)
 
+
+# Funcion para descargar las imagenes de internet del dataset
 def download_image(url: str) -> Image.Image:
     response = requests.get(url, timeout=5)
     response.raise_for_status()
     return Image.open(BytesIO(response.content)).convert("RGB")
 
+# funcion para obtener el embedding para el reranking de imagenes
 def get_vit_embedding(image):
     inputs = vit_processor(images=image, return_tensors="pt")
     with torch.no_grad():
         outputs = vit_model(**inputs)
-    return outputs.pooler_output  # Vector de 768 dimensiones
+    return outputs.pooler_output
 
+# Carga el dataset y los embeddings
 def load_data():
     logger.info("Loading dataset...")
     df = pd.read_csv(DATA_PATH, on_bad_lines='skip')
@@ -63,6 +67,7 @@ def load_data():
     logger.info("Data loaded successfully.")
     return df, clip_embeddings, vit_embeddings
 
+# se encarga de generar los embeddings
 def process_catalog():
     logger.info("Starting catalog processing...")
 
@@ -117,6 +122,7 @@ def process_catalog():
 
     logger.info("Catalog processing completed successfully.")
 
+# procesamiento de los embeddings por gpu
 def _process_batch(images, indices, clip_vectors, vit_vectors, valid_indices):
     # CLIP embeddings (batch real)
     clip_embs = clip_model.encode(

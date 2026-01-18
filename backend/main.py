@@ -1,12 +1,12 @@
-from fastapi import FastAPI, Form, UploadFile, File
+from fastapi import FastAPI, Form, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from backend.chatbot import FashionChatbot
-# Importa tu motor de búsqueda real aquí
-# from backend.search_engine import SearchEngine
+from backend.search_engine import search_query
+from PIL import Image
+import io
 
 app = FastAPI()
 
-# PERMITIR CONEXIÓN DESDE EL FRONTEND
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -14,24 +14,39 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Inicializamos el Bot (ajusta según los parámetros de tu __init__)
-# Si tu chatbot necesita el engine: bot = FashionChatbot(search_engine=SearchEngine())
-bot = FashionChatbot(search_engine=None)
+# Inicializamos el Bot
+bot = FashionChatbot(search_engine=search_query)
 
-@app.post("/chat")  # <--- ESTA ES LA RUTA QUE EL SERVIDOR NO ENCONTRABA
+# Post para procesar texto
+@app.post("/chat")
 async def chat_endpoint(message: str = Form(...)):
-    print(f"Mensaje recibido: {message}") # Ver en consola si llega el texto
     try:
-        response = bot.process_query(message)
-        return response
+        print("estoy en chat")
+        return bot.process_query_text(message)
     except Exception as e:
-        print(f"Error procesando query: {e}")
-        return {"answer": f"Error interno: {str(e)}", "items": []}
+        return {"answer": f"Error: {str(e)}", "items": []}
 
+# Post para procesar imagenes
 @app.post("/search-image")
-async def image_endpoint(file: UploadFile = File(...), message: str = Form(None)):
-    # Lógica temporal para que no de 404 al subir imagen
-    return {"answer": "Búsqueda por imagen en desarrollo", "items": []}
+async def search_image_endpoint(
+        file: UploadFile = File(...),
+        message: str = Form(None)
+):
+    try:
+        image_bytes = await file.read()
+        pil_image = Image.open(io.BytesIO(image_bytes))
+
+        # 1. Búsqueda (Tu lógica actual)
+        if message and message.strip():
+            print(f"🔍 Búsqueda Híbrida: '{message}' + Imagen")
+            return bot.process_query_image(image=pil_image, user_input=message)
+        else:
+            print("🖼️ Búsqueda Solo Imagen")
+            return bot.process_query_image(image=pil_image, user_input=None)
+
+    except Exception as e:
+        print(f"Error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 if __name__ == "__main__":
     import uvicorn
