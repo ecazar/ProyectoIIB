@@ -49,10 +49,7 @@ function handleImageUpload(event) {
         reader.onload = function(e) {
             currentImagePreview = e.target.result;
             showImagePreview(file.name, file.size, e.target.result);
-
-            const searchInput = document.getElementById('searchInput');
-            searchInput.placeholder = 'Describe qué buscas en esta imagen (opcional)...';
-            searchInput.focus();
+            document.getElementById('searchInput').placeholder = 'Describe qué buscas en esta imagen...';
         };
         reader.readAsDataURL(file);
     }
@@ -61,7 +58,6 @@ function handleImageUpload(event) {
 function showImagePreview(fileName, fileSize, imageSrc) {
     const previewContainer = document.getElementById('imagePreviewContainer');
     const sizeInKB = (fileSize / 1024).toFixed(2);
-
     previewContainer.innerHTML = `
         <div class="image-preview-container">
             <img src="${imageSrc}" alt="Preview">
@@ -79,9 +75,7 @@ function removeImage() {
     currentImagePreview = null;
     document.getElementById('imagePreviewContainer').innerHTML = '';
     document.getElementById('fileInput').value = '';
-
-    const searchInput = document.getElementById('searchInput');
-    searchInput.placeholder = 'Describe lo que buscas...';
+    document.getElementById('searchInput').placeholder = 'Describe lo que buscas...';
 }
 
 async function handleSearch() {
@@ -93,123 +87,87 @@ async function handleSearch() {
         return;
     }
 
-    // Mostrar mensaje del usuario
+    // Mostrar mensaje del usuario en el chat
     const userMessageContent = document.createElement('div');
-
     if (currentImage && currentImagePreview) {
         const img = document.createElement('img');
         img.src = currentImagePreview;
         img.className = 'image-preview';
+        img.style.maxWidth = '200px';
         userMessageContent.appendChild(img);
     }
-
     if (query) {
         const text = document.createElement('p');
         text.textContent = query;
-        text.style.marginTop = currentImage ? '12px' : '0';
-        userMessageContent.appendChild(text);
-    } else if (currentImage) {
-        const text = document.createElement('p');
-        text.textContent = '🔍 Búsqueda por imagen';
-        text.style.marginTop = '12px';
-        text.style.fontSize = '16px';
-        text.style.opacity = '0.9';
         userMessageContent.appendChild(text);
     }
-
     addMessage(userMessageContent, true);
 
-    // Limpiar input y preview
+    // Limpiar UI
     input.value = '';
-    document.getElementById('imagePreviewContainer').innerHTML = '';
+    removeImage();
 
-    // Mostrar loading
+    // Mostrar loading con ID único para removerlo luego
+    const loadingId = 'loading-' + Date.now();
     const loadingMsg = `
-        <div style="display: flex; align-items: center; gap: 12px;">
+        <div id="${loadingId}" style="display: flex; align-items: center; gap: 12px;">
             <div class="loading"></div>
-            <span style="font-size: 17px; font-weight: 600;">Buscando los mejores productos para ti...</span>
+            <span style="font-size: 16px;">Analizando tu estilo...</span>
         </div>
     `;
     addMessage(loadingMsg, false);
 
     try {
         const formData = new FormData();
-
         if (currentImage) {
-            formData.append('image', currentImage);
-            formData.append('type', 'image');
-            if (query) {
-                formData.append('query', query);
-            }
+            formData.append('file', currentImage);
+            if (query) formData.append('message', query);
         } else {
-            formData.append('query', query);
-            formData.append('type', 'text');
+            formData.append('message', query);
         }
 
-        // Llamada al backend
-        const response = await fetch('http://localhost:5000/search', {
+        const endpoint = currentImage ? 'http://localhost:8000/search-image' : 'http://localhost:8000/chat';
+
+        const response = await fetch(endpoint, {
             method: 'POST',
             body: formData
         });
 
-        if (!response.ok) {
-            throw new Error('Error en la búsqueda');
-        }
+        if (!response.ok) throw new Error('Error en el servidor');
 
         const data = await response.json();
 
-        // Remover loading
-        const messages = document.querySelectorAll('.message');
-        messages[messages.length - 1].remove();
-
-        // Mostrar explicación de IA primero
-        if (data.ai_explanation) {
-            addMessage(data.ai_explanation, false);
+        // Remover el loading usando el ID
+        const loadingElement = document.getElementById(loadingId);
+        if (loadingElement) {
+            loadingElement.closest('.message').remove();
         }
 
-        // Mostrar resultados
-        if (data.results && data.results.length > 0) {
-            displayResults(data.results);
-        } else {
-            addMessage('😔 No se encontraron resultados para tu búsqueda.', false);
+        // --- INTEGRACIÓN CON LAS LLAVES DEL BACKEND ---
+        // data.answer contiene el texto de Gemini
+        if (data.answer) {
+            addMessage(data.answer, false);
+        }
+
+        // data.items contiene la lista de productos
+        if (data.items && data.items.length > 0) {
+            displayResults(data.items);
+        } else if (!data.answer) {
+            addMessage('😔 No encontré productos exactos en nuestro catálogo.', false);
         }
 
     } catch (error) {
         console.error('Error:', error);
-
-        // Remover loading
-        const messages = document.querySelectorAll('.message');
-        if (messages.length > 0) {
-            messages[messages.length - 1].remove();
-        }
-
-        addMessage(`❌ Hubo un error al procesar tu búsqueda: ${error.message}. Por favor, asegúrate de que el servidor está corriendo.`, false);
-    } finally {
-        // Limpiar imagen actual y restaurar placeholder
-        currentImage = null;
-        currentImagePreview = null;
-        document.getElementById('fileInput').value = '';
-        const searchInput = document.getElementById('searchInput');
-        searchInput.placeholder = 'Describe lo que buscas...';
+        addMessage(`❌ Error: ${error.message}. Verifica que el backend esté activo.`, false);
     }
 }
 
 function displayResults(results) {
-    if (!results || results.length === 0) {
-        return;
-    }
-
     const container = document.createElement('div');
-
-    const title = document.createElement('p');
-    title.style.fontSize = '20px';
-    title.style.fontWeight = '700';
-    title.style.marginBottom = '16px';
-    title.innerHTML = `✨ Aquí están los <strong style="color: #8b5cf6; font-size: 24px;">${results.length}</strong> productos que encontré:`;
-    container.appendChild(title);
+    container.innerHTML = `<p style="font-weight: 700; margin-bottom: 12px;">✨ Resultados encontrados:</p>`;
 
     const grid = document.createElement('div');
-    grid.className = 'results-grid';
+    grid.className = 'results-grid'; // Asegúrate de tener esto en tu CSS
 
     results.forEach(item => {
         const card = document.createElement('div');
@@ -217,18 +175,13 @@ function displayResults(results) {
         card.onclick = () => showProductDetail(item);
 
         card.innerHTML = `
-            <img src="${item.ImageURL || 'https://via.placeholder.com/400x500/8b5cf6/ffffff?text=No+Image'}"
-                 alt="${item.ProductTitle}"
-                 onerror="this.src='https://via.placeholder.com/400x500/8b5cf6/ffffff?text=Error'">
+            <img src="${item.ImageURL || 'https://via.placeholder.com/200'}" alt="${item.ProductTitle}">
             <div class="result-info">
                 <div class="result-title">${item.ProductTitle}</div>
-                <div class="result-meta">📦 ${item.SubCategory}</div>
                 <div class="result-meta">🎨 ${item.Colour}</div>
-                <div class="result-meta">👔 ${item.Usage}</div>
-                <div class="result-score">⭐ ${item.rerank_score}</div>
+                <div class="result-score">⭐ ${parseFloat(item.rerank_score).toFixed(2)}</div>
             </div>
         `;
-
         grid.appendChild(card);
     });
 
@@ -238,22 +191,12 @@ function displayResults(results) {
 
 function showProductDetail(item) {
     const detail = `
-        <div style="background: linear-gradient(135deg, rgba(139, 92, 246, 0.08) 0%, rgba(236, 72, 153, 0.08) 100%);
-                    padding: 20px;
-                    border-radius: 16px;
-                    border: 2px solid rgba(139, 92, 246, 0.3);">
-            <h3 style="font-size: 22px; font-weight: 700; color: #8b5cf6; margin-bottom: 14px;">
-                ${item.ProductTitle}
-            </h3>
-            <div style="font-size: 17px; line-height: 1.8; color: #1e293b;">
-                <div style="margin-bottom: 8px;"><strong>📦 Categoría:</strong> ${item.SubCategory}</div>
-                <div style="margin-bottom: 8px;"><strong>🎨 Color:</strong> ${item.Colour}</div>
-                <div style="margin-bottom: 8px;"><strong>👔 Uso:</strong> ${item.Usage}</div>
-                <div style="margin-top: 12px;">
-                    <strong>⭐ Relevancia:</strong>
-                    <span style="color: #8b5cf6; font-weight: 700; font-size: 18px;">${item.rerank_score}</span>
-                </div>
-            </div>
+        <div style="background: #f8fafc; padding: 15px; border-radius: 12px; border: 1px solid #e2e8f0;">
+            <h4 style="color: #8b5cf6;">${item.ProductTitle}</h4>
+            <p><strong>Categoría:</strong> ${item.SubCategory}</p>
+            <p><strong>Color:</strong> ${item.Colour}</p>
+            <p><strong>Uso:</strong> ${item.Usage}</p>
+            <p style="font-size: 0.9em; color: #64748b;">Puntaje de relevancia: ${item.rerank_score}</p>
         </div>
     `;
     addMessage(detail, false);

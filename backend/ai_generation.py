@@ -12,8 +12,8 @@ def get_response(query, gemini_client_api, top_k=5):
         ai_response = _generate_gemini_summary(query, results, gemini_client_api)
 
     return {
-        "results": results,
-        "ai_explanation": ai_response
+        "results": results
+        #"ai_explanation": ai_response
     }
 
 
@@ -44,7 +44,7 @@ def _generate_gemini_summary(query, results, gemini_client_api):
             model = GENAI_MODEL_NAME,
             contents = prompt
         )
-        return response
+        return response.text
 
     except Exception as e:
         return f"I couldn't generate the AI analysis at this time. Error: {str(e)}"
